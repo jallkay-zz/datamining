@@ -42,11 +42,17 @@ for deg in degrees:
     fit = poly_regression(x_train, y_train, deg)
     print fit
     # calculate the training set rmse
-    rmse = eval_poly_regression(fit, x_train, y_train, deg)
-    print "RMSE TRAIN Deg: " + str(deg) + " -- : " + str(rmse)
+    rmse_train = eval_poly_regression(fit, x_train, y_train, deg)
+    print "RMSE TRAIN Deg: " + str(deg) + " -- : " + str(rmse_train)
     # calculate the test set rmse
-    rmse = eval_poly_regression(fit, x_test, y_test, deg)
-    print "RMSE TEST Deg: " + str(deg) + " -- : " + str(rmse)
+    rmse_test = eval_poly_regression(fit, x_test, y_test, deg)
+    print "RMSE TEST Deg: " + str(deg) + " -- : " + str(rmse_test)
+
+    plt.subplot(5, 4, 13)
+    plt.title('RMSE')
+    plt.plot(deg, rmse_train, '.b', label = 'Train')
+    plt.plot(deg, rmse_test, '.g', label = 'Test')
+
     # Apply the parameters to the training dataset
     y_pred = fit(x_train)
     # space out values
@@ -55,14 +61,14 @@ for deg in degrees:
     y_test_pred = fit(x_test)
     x_test_pred = np.linspace(x_test.min(), x_test.max(), 100)
     # plot training output
-    plt.subplot(4, 4, counter)
+    plt.subplot(5, 4, counter)
     plt.title('Training Degree: ' + str(deg))
     plt.plot(x_train, y_train, '.', label = 'original data')
     plt.plot(x_pred, fit(x_pred), '-', label = 'estimate')
 
     counter = counter + 1
     # plot test output
-    plt.subplot(4, 4, counter)
+    plt.subplot(5, 4, counter)
     plt.title('Test Degree: ' + str(deg))
     plt.plot(x_test, y_test, '.', label = 'original data')
     plt.plot(x_test_pred, fit(x_test_pred), '-', label = 'estimate')
