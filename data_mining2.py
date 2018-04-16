@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import math
+import operator
 
 sns.set()
 # Import data
@@ -108,14 +110,64 @@ def visualise_data(mydata):
     print mydata
 
 
+def getDistance(x, y, length):
+    ''' Function for getting the euclidean distance from one point to another (by squaring and then rooting) '''
+    distance = 0
+    for i in range(length):
+        distance += pow((x[i] - y[i]), 2)
+    return math.sqrt(distance)
+
+def getNeighbours(trainX, testInstance, k):
+    distances = []
+    testLength = len(testInstance)-1
+    for i in range(len(trainX)):
+        dist = getDistance(testInstance, trainX[i], testLength)
+        distances.append((trainX[i], dist))
+    distances.sort(key=operator.itemgetter(1))
+    neighbours = []
+    for j in range(k):
+        neighbours.append(distances[j][0])
+    return neighbours
+
+def getVotes(neighbours):
+    classVotes = {}
+    for i in range(len(neighbours)):
+        response = neighbours[i][-1]
+        if response in classVotes:
+            classVotes[response] += 1
+        else:
+            classVotes[response] = 1
+    sortedVotes = sorted(classVotes.iteritems(), key=operator.itemgetter(1), reverse=True)
+    return sortedVotes[0][0]
+
+
+def getKNN(trainX, trainY, testX, testY, k):
+    predictions = []
+    for i in range(len(testX)):
+        neighbours = getNeighbours(trainX, testX[i], k)
+        result = getVotes(neighbours)
+        predictions.append(result)
+    return predictions
+
+
+def getAccuracy(groundTruth, predicted, KNN=False):
+    percents = []
+    for i, j in zip(groundTruth, predicted):
+        distance = abs(i[0] - j[0]) if not KNN else abs(i[0] - j)
+        percent = (1 - distance) * 100 
+        percents.append(percent)
+        print ("Ground Truth: %i -- Predicted -- %.2f -- Accuracy %.2f%%" % (i, j, percent))
+    print("Overall accuracy %f" % np.mean(percents))
+    return percents
+
 if __name__ == "__main__":
 
     #Init
     np.random.seed(1)
 
     print "Initialising"
-    hiddenLayer = CreateNeuron(2, 10)
-    outputLayer = CreateNeuron(1, 2)
+    hiddenLayer = CreateNeuron(10, 10)
+    outputLayer = CreateNeuron(1, 10)
 
     neuralNetwork = ANN(hiddenLayer, outputLayer)
     
@@ -125,14 +177,20 @@ if __name__ == "__main__":
 
     print "Training"
 
-    neuralNetwork.trainNetwork(trainX, trainY, 60000)
+    neuralNetwork.trainNetwork(trainX, trainY, 100000)
 
     neuralNetwork.showWeights()
 
     print "Testing: "
 
     hiddenData, outputData = neuralNetwork.evaluate(testX)
-    print testY
-    for i in outputData:
-        print "%.15f" % i[0]
+    ANNPercent = getAccuracy(testY, outputData, KNN=False)
+    #print testY
+    # for i in outputData:
+    #     print "%.15f" % i[0]
 
+
+    predictions = getKNN(trainX, trainY, testX, testY, 10)
+    print "KNN Predictions"
+    KNNPercent = getAccuracy(testY, predictions, KNN=True)
+    #print predictions
