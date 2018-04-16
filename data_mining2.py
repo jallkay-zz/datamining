@@ -42,8 +42,8 @@ class ANN():
             outputLayerAdjustment = hiddenLayerOutput.T.dot(outputLayerDelta)
 
             # Change the weightings
-            self.hiddenLayer.synapticWeights += hiddenLayerAdjustment
-            self.outputLayer.synapticWeights += outputLayerAdjustment
+            self.hiddenLayer.synapticWeights += 0.01 * hiddenLayerAdjustment
+            self.outputLayer.synapticWeights += 0.01 * outputLayerAdjustment
 
     def evaluate(self, inputs):
         hiddenLayerOutput = self.sigmoid(np.dot(inputs, self.hiddenLayer.synapticWeights))
@@ -160,35 +160,74 @@ def getAccuracy(groundTruth, predicted, KNN=False):
     print("Overall accuracy %f" % np.mean(percents))
     return percents
 
+def evaluateANN():
+    trainX, trainY, testX, testY = cleandata(mydata)
+    plt.figure(figsize=(16, 32))
+    # create a mesh to plot in
+    h = .02
+    x_min, x_max = trainX[:, 0].min() - 1, trainX[:, 0].max() + 1
+    y_min, y_max = trainX[:, 1].min() - 1, trainX[:, 1].max() + 1
+    xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
+                        np.arange(y_min, y_max, h))
+
+    hidden_layer_dimensions = [2, 3, 4, 5, 10, 20, 50]
+    for i, nn_hdim in enumerate(hidden_layer_dimensions):
+        plt.subplot(5, 2, i+1)
+        plt.title('Hidden Layer size %d' % nn_hdim)
+        print "Initialising"
+        hiddenLayer = CreateNeuron(nn_hdim, 10)
+        outputLayer = CreateNeuron(1, nn_hdim)
+        neuralNetwork = ANN(hiddenLayer, outputLayer)
+        print "Training"
+        neuralNetwork.trainNetwork(trainX, trainY, 60000)
+
+        Z = outputLayer.synapticWeights.reshape(xx.shape)
+        plt.contourf(xx, yy, outputLayer.synapticWeights)
+        yesX = []
+        yesY = []
+        noX = []
+        noY = []
+        for i, k in enumerate(trainX):
+            if trainY[i][0] == 0:
+                noX.append(k[6])
+                noY.append(k[1])
+            elif trainY[i][0] == 1:
+                yesX.append(k[6])
+                yesY.append(k[1])
+        plt.scatter(noX, noY, color='red')
+        plt.scatter(yesX, yesY, color='green')
+        
+    plt.show()
+
 if __name__ == "__main__":
 
     #Init
-    np.random.seed(1)
+    # np.random.seed(1)
 
-    print "Initialising"
-    hiddenLayer = CreateNeuron(10, 10)
-    outputLayer = CreateNeuron(1, 10)
+    # print "Initialising"
+    # hiddenLayer = CreateNeuron(9, 10)
+    # outputLayer = CreateNeuron(1, 9)
 
-    neuralNetwork = ANN(hiddenLayer, outputLayer)
+    # neuralNetwork = ANN(hiddenLayer, outputLayer)
     
-    neuralNetwork.showWeights()
+    # neuralNetwork.showWeights()
 
-    trainX, trainY, testX, testY = cleandata(mydata)
+    # trainX, trainY, testX, testY = cleandata(mydata)
 
-    print "Training"
+    # print "Training"
 
-    neuralNetwork.trainNetwork(trainX, trainY, 100000)
+    # neuralNetwork.trainNetwork(trainX, trainY, 60000)
 
-    neuralNetwork.showWeights()
+    # neuralNetwork.showWeights()
 
-    print "Testing: "
+    # print "Testing: "
 
-    hiddenData, outputData = neuralNetwork.evaluate(testX)
-    ANNPercent = getAccuracy(testY, outputData, KNN=False)
+    # hiddenData, outputData = neuralNetwork.evaluate(testX)
+    # ANNPercent = getAccuracy(testY, outputData, KNN=False)
     #print testY
     # for i in outputData:
     #     print "%.15f" % i[0]
-
+    evaluateANN()
 
     predictions = getKNN(trainX, trainY, testX, testY, 10)
     print "KNN Predictions"
