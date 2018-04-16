@@ -57,7 +57,7 @@ class ANN():
         print "Output Layer Weights:"
         print self.outputLayer.synapticWeights
 
-def cleandata(mydata):
+def cleandata(mydata, KNN=False):
     trainX = mydata.sample(frac=0.9)
     testX = mydata.drop(trainX.index)
     trainY = []
@@ -77,11 +77,20 @@ def cleandata(mydata):
 
     trainY = np.array(trainY)
     testY  = np.array(testY)
-
     trainX = trainX.drop("Class", axis=1) # Remove the identifying class
-    trainX = np.array((trainX-trainX.min())/(trainX.max()-trainX.min())) # Normalize to 0 
     testX  = testX.drop("Class", axis=1) # Remove the identifying class
-    testX  = np.array((testX-testX.min())/(testX.max()-testX.min())) # Normalize to 0 
+
+    if KNN:
+        trainX.insert(10, 'Condition', trainY)
+        testX.insert(10, 'Condition', testY)
+        
+        
+    trainX = np.array(trainX)
+    testX  = np.array(testX)
+    
+    if not KNN:
+        trainX = np.array((trainX-trainX.min())/(trainX.max()-trainX.min())) # Normalize to 0 
+        testX  = np.array((testX-testX.min())/(testX.max()-testX.min())) # Normalize to 0 
 
     return trainX, trainY, testX, testY
 
@@ -202,34 +211,32 @@ def evaluateANN():
 if __name__ == "__main__":
 
     #Init
-    # np.random.seed(1)
+    np.random.seed(1)
 
-    # print "Initialising"
-    # hiddenLayer = CreateNeuron(9, 10)
-    # outputLayer = CreateNeuron(1, 9)
+    print "Initialising"
+    hiddenLayer = CreateNeuron(10, 10)
+    outputLayer = CreateNeuron(1, 10)
 
-    # neuralNetwork = ANN(hiddenLayer, outputLayer)
+    neuralNetwork = ANN(hiddenLayer, outputLayer)
     
-    # neuralNetwork.showWeights()
+    neuralNetwork.showWeights()
 
-    # trainX, trainY, testX, testY = cleandata(mydata)
+    trainX, trainY, testX, testY = cleandata(mydata)
 
-    # print "Training"
+    print "Training"
 
-    # neuralNetwork.trainNetwork(trainX, trainY, 60000)
+    neuralNetwork.trainNetwork(trainX, trainY, 60000)
 
-    # neuralNetwork.showWeights()
+    neuralNetwork.showWeights()
 
-    # print "Testing: "
+    print "Testing: "
 
-    # hiddenData, outputData = neuralNetwork.evaluate(testX)
-    # ANNPercent = getAccuracy(testY, outputData, KNN=False)
-    #print testY
-    # for i in outputData:
-    #     print "%.15f" % i[0]
-    evaluateANN()
+    hiddenData, outputData = neuralNetwork.evaluate(testX)
+    ANNPercent = getAccuracy(testY, outputData, KNN=False)
+
+    trainX, trainY, testX, testY = cleandata(mydata, KNN=True)
 
     predictions = getKNN(trainX, trainY, testX, testY, 10)
     print "KNN Predictions"
     KNNPercent = getAccuracy(testY, predictions, KNN=True)
-    #print predictions
+
