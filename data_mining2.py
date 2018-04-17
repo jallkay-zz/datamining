@@ -1,17 +1,20 @@
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import math
 import operator
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+
 sns.set()
+
 # Import data
 mydata = pd.read_csv("dataset.csv")
 
 class CreateNeuron():
     def __init__(self, numOfNeurons, numPerNeuron):
         self.synapticWeights = 2 * np.random.random((numPerNeuron, numOfNeurons)) - 1
+        self.bias            = np.random.uniform(size=(1,numOfNeurons))
 
 class ANN():
     def __init__(self, hiddenLayer, outputLayer):
@@ -42,12 +45,15 @@ class ANN():
             outputLayerAdjustment = hiddenLayerOutput.T.dot(outputLayerDelta)
 
             # Change the weightings
-            self.hiddenLayer.synapticWeights += 0.01 * hiddenLayerAdjustment
-            self.outputLayer.synapticWeights += 0.01 * outputLayerAdjustment
+            self.hiddenLayer.synapticWeights += hiddenLayerAdjustment * 0.1
+            self.hiddenLayer.bias += np.sum(hiddenLayerDelta, axis=0,keepdims=True) * 0.1
+            self.outputLayer.synapticWeights += outputLayerAdjustment * 0.1
+            self.outputLayer.bias += np.sum(outputLayerDelta, axis=0,keepdims=True) * 0.1
+
 
     def evaluate(self, inputs):
-        hiddenLayerOutput = self.sigmoid(np.dot(inputs, self.hiddenLayer.synapticWeights))
-        outputLayerOutput = self.sigmoid(np.dot(hiddenLayerOutput, self.outputLayer.synapticWeights))
+        hiddenLayerOutput = self.sigmoid(np.dot(inputs, self.hiddenLayer.synapticWeights) + self.hiddenLayer.bias)
+        outputLayerOutput = self.sigmoid(np.dot(hiddenLayerOutput, self.outputLayer.synapticWeights) + self.outputLayer.bias)
 
         return hiddenLayerOutput, outputLayerOutput
     
@@ -57,9 +63,22 @@ class ANN():
         print "Output Layer Weights:"
         print self.outputLayer.synapticWeights
 
-def cleandata(mydata, KNN=False):
-    trainX = mydata.sample(frac=0.9)
-    testX = mydata.drop(trainX.index)
+def cleandata(mydata, KNN=False, CV=False, CVNumber=0):
+    if not CV:
+        trainX = mydata.sample(frac=0.9)
+        testX = mydata.drop(trainX.index)
+    else:
+        size = len(mydata) / 10
+        testX = []
+        idxStart = int(math.floor(CVNumber * size))
+        idxEnd = int(math.floor((CVNumber + 1) * size) - (size / 2))
+        split = len(mydata) / 2
+        
+        sideA = mydata[idxStart:idxEnd]
+        sideB = mydata[idxStart + split:idxEnd + split]
+        testX = pd.concat([sideA, sideB])
+        trainX = mydata.drop(testX.index)
+    
     trainY = []
     testY = []
 
@@ -95,28 +114,26 @@ def cleandata(mydata, KNN=False):
     return trainX, trainY, testX, testY
 
 
-def visualise_data(mydata):
-    # Visualise data
-
+def visualiseData(mydata):
+    # Visualise data columns
     print mydata.describe()
+    # Check for empty values
     print ("Empty values: {}.".format(mydata.isnull().values.any()))
-
+    # Split data into diabetic and non dieabetic 
     diabetes   = mydata[mydata.Class == "Diabetes"]
     nodiabetes = mydata[mydata.Class == "DR"] 
-
+    # Get Arterial Blood Pressure from both 
     data = [diabetes.PressureA, nodiabetes.PressureA]
-
+    # Subplot the data to a boxplot for both
     plt.figure()
     ax1 = plt.subplot(121)
     plt.boxplot(data, labels = ["Diabetes", "No Diabetes"])
-
-
+    # Subplot the density plot of the diabetes and non diabetes
     ax2 = plt.subplot(122)
     pt = sns.kdeplot(diabetes.Tortuosity, shade=True, label="Diabetes")
     pt = sns.kdeplot(nodiabetes.Tortuosity, shade=True, label="No Diabetes")
-
+    # Show plots
     plt.show()
-    print mydata
 
 
 def getDistance(x, y, length):
@@ -159,15 +176,16 @@ def getKNN(trainX, trainY, testX, testY, k):
     return predictions
 
 
-def getAccuracy(groundTruth, predicted, KNN=False):
+def getAccuracy(groundTruth, predicted, KNN=False, debug=True):
     percents = []
     for i, j in zip(groundTruth, predicted):
         distance = abs(i[0] - j[0]) if not KNN else abs(i[0] - j)
         percent = (1 - distance) * 100 
         percents.append(percent)
-        print ("Ground Truth: %i -- Predicted -- %.2f -- Accuracy %.2f%%" % (i, j, percent))
+        if debug:
+            print ("Ground Truth: %i -- Predicted -- %.2f -- Accuracy %.2f%%" % (i, j, percent))
     print("Overall accuracy %f" % np.mean(percents))
-    return percents
+    return np.mean(percents)
 
 def evaluateANN():
     trainX, trainY, testX, testY = cleandata(mydata)
@@ -179,8 +197,8 @@ def evaluateANN():
     xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
                         np.arange(y_min, y_max, h))
 
-    hidden_layer_dimensions = [2, 3, 4, 5, 10, 20, 50]
-    for i, nn_hdim in enumerate(hidden_layer_dimensions):
+    neurons = [2, 3, 4, 5, 10, 20, 50]
+    for i, nn_hdim in enumerate(neurons):
         plt.subplot(5, 2, i+1)
         plt.title('Hidden Layer size %d' % nn_hdim)
         print "Initialising"
@@ -208,35 +226,57 @@ def evaluateANN():
         
     plt.show()
 
+
+def cvANN():
+
+    neurons = [2, 10, 50]
+    overallPercents = []
+    for i, nn_hdim in enumerate(neurons):
+        percents = []
+        for fold in range(0, 10):
+            trainX, trainY, testX, testY = cleandata(mydata, CV=True, CVNumber=fold)
+            hiddenLayer = CreateNeuron(nn_hdim, 10)
+            outputLayer = CreateNeuron(1, nn_hdim)
+            neuralNetwork = ANN(hiddenLayer, outputLayer)
+            neuralNetwork.trainNetwork(trainX, trainY, 60000)
+            hiddenData, outputData = neuralNetwork.evaluate(testX)
+            print "Fold %i:" % fold
+            ANNPercent = getAccuracy(testY, outputData, KNN=False, debug=False)
+           
+            percents.append(ANNPercent)
+            
+        print("Neuron: %i after 10 Fold CV percentage %.2f" % (nn_hdim, np.mean(percents)))
+        overallPercents.append(np.mean(percents))
+    plt.subplot(121)
+    plt.plot(neurons, overallPercents)
+
+
+def cvKNN():
+
+    k = [1, 5, 10]
+    overallPercents = []
+    for i, iterk in enumerate(k):
+        percents = []
+        for fold in range(0, 10):
+            trainX, trainY, testX, testY = cleandata(mydata, KNN=True, CV=True, CVNumber=fold)
+            predictions = getKNN(trainX, trainY, testX, testY, iterk)
+            print "KNN Predictions"
+            KNNPercent = getAccuracy(testY, predictions, KNN=True)
+            percents.append(KNNPercent)
+            
+        print("K: %i after 10 Fold CV percentage %.2f" % (iterk, np.mean(percents)))
+        overallPercents.append(np.mean(percents))
+
+    plt.subplot(122)
+    plt.plot(k, overallPercents)
+    
+
 if __name__ == "__main__":
 
     #Init
     np.random.seed(1)
 
-    print "Initialising"
-    hiddenLayer = CreateNeuron(10, 10)
-    outputLayer = CreateNeuron(1, 10)
-
-    neuralNetwork = ANN(hiddenLayer, outputLayer)
-    
-    neuralNetwork.showWeights()
-
-    trainX, trainY, testX, testY = cleandata(mydata)
-
-    print "Training"
-
-    neuralNetwork.trainNetwork(trainX, trainY, 60000)
-
-    neuralNetwork.showWeights()
-
-    print "Testing: "
-
-    hiddenData, outputData = neuralNetwork.evaluate(testX)
-    ANNPercent = getAccuracy(testY, outputData, KNN=False)
-
-    trainX, trainY, testX, testY = cleandata(mydata, KNN=True)
-
-    predictions = getKNN(trainX, trainY, testX, testY, 10)
-    print "KNN Predictions"
-    KNNPercent = getAccuracy(testY, predictions, KNN=True)
-
+    plt.figure()
+    cvANN()
+    cvKNN()
+    plt.show()
