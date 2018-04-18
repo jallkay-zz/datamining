@@ -228,7 +228,6 @@ def evaluateANN():
 
 
 def cvANN():
-
     neurons = [2, 10, 50]
     overallPercents = []
     for i, nn_hdim in enumerate(neurons):
@@ -273,6 +272,8 @@ def cvKNN():
 
 if __name__ == "__main__":
 
+
+    visualiseData(mydata)
     #Init
     np.random.seed(1)
 
