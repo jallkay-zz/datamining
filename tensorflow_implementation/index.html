@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.0.0-alpha1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-csv/0.71/jquery.csv-0.71.min.js"></script>
+    <!-- Load TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@0.10.0"> </script>
+    <script type="text/javascript">  
+    var global = this;
+    $(document).ready(function() {
+
+    // The event listener for the file upload
+    document.getElementById('txtFileUpload').addEventListener('change', upload, false);
+
+    // Method that checks that the browser supports the HTML5 File API
+    function browserSupportFileUpload() {
+        var isCompatible = false;
+        if (window.File && window.FileReader && window.FileList && window.Blob) {
+        isCompatible = true;
+        }
+        return isCompatible;
+    }
+    
+    // Method that reads and processes the selected file
+    function upload(evt) {
+        if (!browserSupportFileUpload()) {
+            alert('The File APIs are not fully supported in this browser!');
+            } else {
+                var file = evt.target.files[0];
+                var reader = new FileReader();
+                global.mydata = null;
+                reader.readAsText(file);
+                reader.onload = function(event) {
+                    var csvData = event.target.result;
+                    global.mydata = $.csv.toArrays(csvData);
+                    if (global.mydata && global.mydata.length > 0) {
+                        global.cleaneddata = global.mydata.map(function(val){
+                            return val.slice(3,10);
+                        });
+                        global.cleaneddata = global.cleaneddata.slice(1);
+                        alert('Imported -' + global.mydata.length + '- rows successfully! And removed the unused columns...');
+                    } else {
+                        alert('No data to import!');
+                    }
+                };
+                reader.onerror = function() {
+                    alert('Unable to read ' + file.fileName);
+                };
+            }
+        }
+    });
+
+
+    function calc_dist_euclidean(vec_1, vec_2) {
+        var dist_euclidean = tf.norm(tf.sub(vec_1, vec_2), ord='euclidean', axis=1);
+        return dist_euclidean
+    }
+    function init_cent(dataset, k=3) {
+        var indexes = tf.randomUniform([k], 0, dataset.shape[0], dtype='int32')
+
+        var centroids = []
+        for(var i=0; i < dataset.shape[0]; i++) {
+            if(indexes.dataSync().indexOf(i) != -1) {
+                centroids.push(global.cleaneddata[i]);
+            }
+        }
+        centroids = tf.tensor(centroids);
+        return centroids
+    }
+
+    function k_means() {
+        var k = 3;
+        var iterations = 100;
+        var dataset = tf.tensor(global.cleaneddata);
+        var centroids = init_cent(dataset, k);
+        // create v ectors to store the data points and distances
+        var cluster_assigning = tf.zeros([dataset.shape[0]], dtype='float32');
+        var distances = tf.zeros([dataset.shape[0], k], dtype='float32');
+
+        for(var i = 0; i < iterations; i++) {
+            // assign all points in dataset to nearest value
+            var myTempDistances = [];
+            for(var j = 0; j < centroids.shape[0]; j++) {
+                var idxStart = centroids.shape[1] * j;
+                var idxFinish = idxStart + centroids.shape[1];
+                var myTempArr = []
+                for(var p = idxStart; p < idxFinish; p++) {
+                    myTempArr.push(centroids.get(p));
+                }
+                var temp_distances = calc_dist_euclidean(tf.tensor(myTempArr), dataset);
+                
+                for(var d = 0; d < dataset.shape[0]; d++) {
+                    var myTempDistancesArr = myTempDistances[d];
+                    if(myTempDistancesArr == null) {
+                        myTempDistancesArr = [temp_distances.get(d)];
+                    }
+                    else {
+                        myTempDistancesArr.push(temp_distances.get(d));
+                    }
+                    myTempDistances.push(myTempDistancesArr);
+                }; 
+            };
+            distances = tf.tensor(myTempDistances);
+            //check class membership of each point by checking nearest point to it
+            cluster_assigning = distances.argMin(axis=1);
+
+            for(var h = 0; h < k; h++ ) {
+                // Get the values of dataset in a for loop of cluster assigning
+                centroids[h] = [];
+                var temparr = [];
+                for(var y = 0; y < cluster_assigning.shape[0]; y++) {
+                    if(cluster_assigning.get(y) == h) {
+                        temparr.push(dataset[y]);// add value to temporary array
+                    };             
+                };
+                centroids[h] = tf.mean(tf.tensor(temparr));   
+            };
+        };
+        centroids.print();
+        cluster_assigning.print();
+        return centroids, cluster_assigning
+    };
+    
+</script>
+    </head>
+    <body>
+        <div id="dvImportSegments" class="fileupload ">
+    <fieldset>
+        <legend>Upload your CSV File</legend>
+        <input type="file" name="File Upload" id="txtFileUpload" accept=".csv" />
+    </fieldset>
+    </div>
+    </body>
+</html>
